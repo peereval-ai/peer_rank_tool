@@ -1,7 +1,6 @@
 # PeerEval
 
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-red.svg)](#install)
-[![arxiv](https://img.shields.io/badge/arXiv-2307.02762-b31b1b.svg)](https://arxiv.org/abs/2307.02762)
 
 PeerEval ranks large language models by having them judge each other. Every model answers the same questions; then every model compares pairs of anonymous answers. PeerEval turns those pairwise verdicts into a leaderboard using **PRD Peer Rank**, which gives a judge more weight when its own answers are rated well by its peers.
 
@@ -139,7 +138,7 @@ Only questions answered by every model are judged.
 
 | Metric | What it is |
 |---|---|
-| **PRD score** | Peer Rank (Li et al., 2023). All judges start with equal weight. A model's score is the weighted average of the judges' win rates for it. The scores are scaled to 0–1 and normalized to sum to 1, and become the judges' new weights; this repeats until the weights stop changing. |
+| **PRD score** | Peer Rank. All judges start with equal weight. A model's score is the weighted average of the judges' win rates for it. The scores are scaled to 0–1 and normalized to sum to 1, and become the judges' new weights; this repeats until the weights stop changing. |
 | **Judge weight** | The final PRD weight of each model as a judge (sums to 1). Because of the 0–1 scaling, the lowest-scoring model always gets weight 0. |
 | **Win rate** | Average result over all of a model's comparisons (win 1, tie 0.5, loss 0), every judge counted equally. |
 | **Bradley-Terry** | Log-strength from a Bradley-Terry model fitted to the same verdicts (ties count half). |
@@ -147,18 +146,6 @@ Only questions answered by every model are judged.
 | **Pairwise matrix** | `pairwise[a][b]`: share of comparisons in which `a` beats `b`. |
 | **Position bias** | Per judge: share of decisive verdicts won by the answer shown first, and how often the verdict is unchanged when the two answers are swapped. |
 
-## Citation
-
-PRD Peer Rank:
-
-```
-@article{li2023prd,
-  title={PRD: Peer Rank and Discussion Improve Large Language Model based Evaluations},
-  author={Li, Ruosen and Patel, Teerth and Du, Xinya},
-  journal={arXiv preprint arXiv:2307.02762},
-  year={2023}
-}
-```
 
 ## License
 
