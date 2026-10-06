@@ -26,3 +26,4 @@ peereval = "peereval.cli:main"
 
 [project.urls]
 Homepage = "https://peereval-ai.github.io"
+Repository = "https://github.com/peereval-ai/peer_rank_tool"

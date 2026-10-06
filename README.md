@@ -17,8 +17,8 @@ pip install "peereval[judge]"   # also generate judgments through an API
 From source:
 
 ```bash
-git clone https://github.com/peereval-ai/peereval.git
-cd peereval && pip install -e ".[judge]"
+git clone https://github.com/peereval-ai/peer_rank_tool.git
+cd peer_rank_tool && pip install -e ".[judge]"
 ```
 
 ## Two steps
