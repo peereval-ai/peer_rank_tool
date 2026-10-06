@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from . import metrics
+from .bootstrap import bootstrap as run_bootstrap
 from .data import Judgment, load_judgments, normalize
 
 
@@ -29,6 +30,8 @@ class Result:
     pairwise: dict[str, dict[str, float]]
     position_bias: dict[str, dict[str, float]]
     prd_iterations: int = 0
+    ci: dict[str, dict[str, list[float]]] = field(default_factory=dict)  # metric -> model -> [lo, hi]
+    rank_ub: dict[str, int] = field(default_factory=dict)
 
     def ranking(self) -> list[str]:
         """Models best first: by PRD score, or by win rate when PRD is unavailable."""
@@ -45,20 +48,26 @@ class Result:
                 "win_rate": self.win_rate[m],
                 "bradley_terry": self.bradley_terry[m],
                 "self_bias_pp": self.self_bias[m]["bias_pp"],
+                **({"rank_ub": self.rank_ub[m], "prd_ci_low": self.ci["prd"][m][0],
+                    "prd_ci_high": self.ci["prd"][m][1]} if self.ci else {}),
             }
             for i, m in enumerate(self.ranking(), 1)
         ]
 
     def to_markdown(self) -> str:
-        head = "| Rank | Model | PRD score | Judge weight | Win rate | Bradley-Terry | Self-bias (pp) |"
-        sep = "|---:|---|---:|---:|---:|---:|---:|"
+        ci = bool(self.ci)
+        head = "| Rank |" + (" Rank (UB) |" if ci else "") + " Model | PRD score |" + (" 95% CI |" if ci else "") + \
+            " Judge weight | Win rate | Bradley-Terry | Self-bias (pp) |"
+        sep = "|---:|" + ("---:|" if ci else "") + "---|---:|" + ("---|" if ci else "") + "---:|---:|---:|---:|"
         lines = [head, sep]
         def f(v: float, spec: str) -> str:
             return "–" if v is None or math.isnan(v) else format(v, spec)
 
         for r in self.rows():
+            ub = f" {r['rank_ub']} |" if ci else ""
+            band = f" {f(r['prd_ci_low'], '.3f')}–{f(r['prd_ci_high'], '.3f')} |" if ci else ""
             lines.append(
-                f"| {r['rank']} | {r['model']} | {f(r['prd_score'], '.3f')} | {f(r['judge_weight'], '.3f')} | "
+                f"| {r['rank']} |{ub} {r['model']} | {f(r['prd_score'], '.3f')} |{band} {f(r['judge_weight'], '.3f')} | "
                 f"{f(r['win_rate'], '.3f')} | {f(r['bradley_terry'], '+.3f')} | {f(r['self_bias_pp'], '+.1f')} |"
             )
         return "\n".join(lines)
@@ -85,8 +94,10 @@ class Leaderboard:
 
     def to_csv(self, path: str | Path) -> None:
         with open(path, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=["slice", "rank", "model", "prd_score", "judge_weight",
-                                              "win_rate", "bradley_terry", "self_bias_pp"])
+            fields = ["slice", "rank", "model", "prd_score", "judge_weight", "win_rate", "bradley_terry", "self_bias_pp"]
+            if self.overall.ci:
+                fields += ["rank_ub", "prd_ci_low", "prd_ci_high"]
+            w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
             for name, r in [("overall", self.overall), *self.by_dataset.items()]:
                 for row in r.rows():
@@ -102,9 +113,11 @@ def complete_questions(judgments: Sequence[Judgment], models: Sequence[str], jud
     return {q for q, cells in seen.items() if len(cells) == need}
 
 
-def score_slice(name: str, judgments: Sequence[Judgment], models: Sequence[str]) -> Result:
+def score_slice(name: str, judgments: Sequence[Judgment], models: Sequence[str],
+                bootstrap: int = 0, seed: int = 0) -> Result:
     keep = set(models)
     prd, weights, iters = metrics.peer_rank([j for j in judgments if j.judge in keep], models)
+    boot = run_bootstrap(judgments, models, n=bootstrap, seed=seed) if bootstrap else {}
     return Result(
         name=name,
         models=list(models),
@@ -118,6 +131,8 @@ def score_slice(name: str, judgments: Sequence[Judgment], models: Sequence[str])
         pairwise=metrics.pairwise_matrix(judgments, models),
         position_bias=metrics.position_bias(judgments),
         prd_iterations=iters,
+        ci=boot.get("ci", {}),
+        rank_ub=boot.get("rank_ub", {}),
     )
 
 
@@ -126,6 +141,8 @@ def score(
     models: Sequence[str] | None = None,
     by_dataset: bool = True,
     complete_only: bool = False,
+    bootstrap: int = 0,
+    seed: int = 0,
 ) -> Leaderboard:
     """Score pairwise judgments and return a :class:`Leaderboard`.
 
@@ -138,6 +155,10 @@ def score(
         by_dataset: also score each dataset separately.
         complete_only: keep only questions that have every verdict
             (all pairs x all judges x both display orders).
+        bootstrap: number of bootstrap samples for 95% confidence intervals and
+            "Rank (UB)" (questions resampled with replacement within each dataset).
+            0 (default) skips it; 1000 is a good choice.
+        seed: random seed for the bootstrap.
     """
     if isinstance(judgments, list) and judgments and isinstance(judgments[0], dict):
         judgments = normalize(judgments)
@@ -154,8 +175,8 @@ def score(
         js = [j for j in js if (j.dataset, j.question_id) in ok]
     if not js:
         raise ValueError("no judgments left to score")
-    board = Leaderboard(overall=score_slice("overall", js, models))
+    board = Leaderboard(overall=score_slice("overall", js, models, bootstrap, seed))
     if by_dataset:
         for ds in sorted({j.dataset for j in js}):
-            board.by_dataset[ds] = score_slice(ds, [j for j in js if j.dataset == ds], models)
+            board.by_dataset[ds] = score_slice(ds, [j for j in js if j.dataset == ds], models, bootstrap, seed)
     return board

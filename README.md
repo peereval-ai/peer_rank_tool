@@ -44,6 +44,10 @@ overall.prd                                # PRD score per model
 overall.judge_weights                      # PRD weight of each model as a judge
 overall.self_bias["gpt-6-astra"]           # {"self", "others", "bias_pp"}
 overall.pairwise["claude-opus-5-5"]["glm-5.3"]   # share of comparisons won
+
+board = peereval.score("examples/judgments.jsonl", bootstrap=1000)
+board.overall.ci["prd"]["glm-5.3"]          # [low, high], 95% interval
+board.overall.rank_ub                      # best rank each model could have
 ```
 
 Parameters of `peereval.score`:
@@ -52,14 +56,16 @@ Parameters of `peereval.score`:
 - `models`: contestants to keep. Default: every model that appears in a pair. Judges do not have to be contestants: verdicts from outside judges count toward win rate, Bradley-Terry and the pairwise matrix, but PRD weights only go to judges that are also contestants. If no judge is a contestant, PRD is left empty and models are ranked by win rate.
 - `by_dataset`: also score each `dataset` separately. Default `True`.
 - `complete_only`: keep only questions that have every verdict (all pairs × all judges × both orders). Default `False`.
+- `bootstrap`: number of bootstrap samples for 95% confidence intervals and Rank (UB), e.g. `1000`. Default `0` (off).
+- `seed`: random seed for the bootstrap. Default `0`.
 
 ### Command line
 
 ```bash
-peereval score judgments/*.jsonl --json results.json --csv leaderboard.csv
+peereval score judgments/*.jsonl --bootstrap 1000 --json results.json --csv leaderboard.csv
 ```
 
-Options: `--models`, `--no-by-dataset`, `--complete-only`.
+Options: `--models`, `--no-by-dataset`, `--complete-only`, `--bootstrap N`, `--seed`.
 
 Example output on `examples/judgments.jsonl` (3 models, 3 questions):
 
@@ -144,6 +150,8 @@ Only questions answered by every model are judged.
 | **Bradley-Terry** | Log-strength from a Bradley-Terry model fitted to the same verdicts (ties count half). |
 | **Self-bias** | How often a model prefers its own answer when it is the judge, minus how often the other judges prefer that model's answer, in percentage points. |
 | **Pairwise matrix** | `pairwise[a][b]`: share of comparisons in which `a` beats `b`. |
+| **95% CI** | Bootstrap confidence interval: questions are resampled with replacement (within each dataset) and every score is recomputed; the interval covers the middle 95% of the results. Available for PRD score, win rate and Bradley-Terry. |
+| **Rank (UB)** | 1 + the number of models whose PRD interval lies entirely above this model's. Models with the same Rank (UB) are not clearly separated. |
 | **Position bias** | Per judge: share of decisive verdicts won by the answer shown first, and how often the verdict is unchanged when the two answers are swapped. |
 
 

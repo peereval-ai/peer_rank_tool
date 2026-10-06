@@ -42,7 +42,7 @@ def peer_rank(
     max_iter: int = 1000,
     tol: float = 1e-10,
 ) -> tuple[dict[str, float], dict[str, float], int]:
-    """PRD Peer Rank (Li et al., 2023, arXiv:2307.02762).
+    """PRD Peer Rank.
 
     Every judge starts with equal weight. A model's score is the weighted average
     of the judges' win rates for it; the scores are min-max scaled and normalized
@@ -53,7 +53,16 @@ def peer_rank(
     are ignored here. If no judge is a contestant, every score is NaN. Returns
     ``(scores, judge_weights, iterations)``.
     """
-    per_judge = judge_win_rates(judgments, models)
+    return peer_rank_from(judge_win_rates(judgments, models), models, max_iter, tol)
+
+
+def peer_rank_from(
+    per_judge: dict[str, dict[str, float]],
+    models: Sequence[str],
+    max_iter: int = 1000,
+    tol: float = 1e-10,
+) -> tuple[dict[str, float], dict[str, float], int]:
+    """:func:`peer_rank` from precomputed ``[judge][model]`` win rates."""
     judges = [m for m in models if m in per_judge]
     if not judges:
         return {m: math.nan for m in models}, {}, 0
@@ -93,14 +102,19 @@ def bradley_terry(judgments: Sequence[Judgment], models: Sequence[str], max_iter
         wins[j.model_a] += j.score(j.model_a)
         wins[j.model_b] += j.score(j.model_b)
         games[j.pair] += 1
+    return bradley_terry_from(wins, games, models, max_iter)
+
+
+def bradley_terry_from(wins: dict, games: dict, models: Sequence[str], max_iter: int = 2000) -> dict[str, float]:
+    """:func:`bradley_terry` from total wins per model and games per sorted pair."""
     strength = {m: 1.0 for m in models}
     for _ in range(max_iter):
         new = {}
         for i in models:
             denom = sum(
-                games[tuple(sorted((i, k)))] / (strength[i] + strength[k]) for k in models if k != i
+                games.get(tuple(sorted((i, k))), 0) / (strength[i] + strength[k]) for k in models if k != i
             )
-            new[i] = wins[i] / denom if denom else strength[i]
+            new[i] = wins.get(i, 0.0) / denom if denom else strength[i]
         mean = sum(new.values()) / len(new)
         new = {m: max(v / mean, 1e-12) for m, v in new.items()}
         done = max(abs(math.log(new[m] / strength[m])) for m in models) < 1e-9

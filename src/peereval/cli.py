@@ -18,6 +18,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--no-by-dataset", action="store_true", help="Only score all data together.")
     s.add_argument("--complete-only", action="store_true",
                    help="Keep only questions that have every pair x judge x order verdict.")
+    s.add_argument("--bootstrap", type=int, default=0, metavar="N",
+                   help="Bootstrap samples for 95%% confidence intervals and Rank (UB), e.g. 1000.")
+    s.add_argument("--seed", type=int, default=0, help="Random seed for the bootstrap.")
     s.add_argument("--json", help="Write full results (scores, weights, matrices) to this JSON file.")
     s.add_argument("--csv", help="Write the leaderboard tables to this CSV file.")
 
@@ -31,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "score":
         board = score(args.judgments, models=args.models, by_dataset=not args.no_by_dataset,
-                      complete_only=args.complete_only)
+                      complete_only=args.complete_only, bootstrap=args.bootstrap, seed=args.seed)
         print(board.to_markdown())
         if args.json:
             board.to_json(args.json)

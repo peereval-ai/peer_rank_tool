@@ -120,3 +120,16 @@ def test_external_judge_counts_but_gets_no_weight():
     r = score(rows).overall
     assert "ext" not in r.judge_weights and set(r.judge_weights) == {"x", "y", "z"}
     assert r.win_rate["z"] > 0  # ext's votes count in win rate
+
+
+def test_bootstrap_intervals_and_rank_ub():
+    order = ["x", "y", "z"]
+    rows = []
+    for q in range(20):
+        rows += full_round(str(q), lambda a, b: min(a, b, key=order.index))
+    r = score(rows, bootstrap=50, seed=1).overall
+    for m in order:
+        lo, hi = r.ci["prd"][m]
+        assert lo <= r.prd[m] <= hi
+    assert r.rank_ub == {"x": 1, "y": 2, "z": 3}  # identical questions: no uncertainty
+    assert "95% CI" in r.to_markdown()
