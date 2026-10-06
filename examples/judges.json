@@ -1,0 +1,6 @@
+[
+  {"name": "gpt-6-astra", "model": "openai/gpt-6-astra", "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY"},
+  {"name": "glm-5.3", "model": "z-ai/glm-5.3", "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY"},
+  {"name": "qwen3.8-27b", "model": "Qwen/Qwen3.8-27B", "base_url": "http://localhost:8000/v1", "api_key_env": "LOCAL_API_KEY",
+   "extra_body": {"chat_template_kwargs": {"enable_thinking": false}}}
+]

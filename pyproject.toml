@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "peereval"
+version = "0.1.0"
+authors = [{ name = "Liqiang Jing" }]
+description = "Rank LLMs by having them judge each other: PRD Peer Rank, judge weights, and self-bias from pairwise judgments."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = []
+
+[project.optional-dependencies]
+judge = ["openai>=1.0"]
+dev = ["pytest"]
+
+[project.scripts]
+peereval = "peereval.cli:main"
+
+[project.urls]
+Homepage = "https://peereval-ai.github.io"
