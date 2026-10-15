@@ -12,6 +12,15 @@ Checks whether a PRD-weighted panel of LLM judges agrees with human preferences 
 
 ## Data
 
+Each dataset is split into two parts with different jobs:
+
+| Part | Files | Job | Uses human labels? |
+|---|---|---|---|
+| **Weight queries** (25 per dataset) | `<name>_queries.jsonl` | **Compute the PRD judge weights** (step 1). The judge models answer these queries themselves and judge each other's answers. | No: only the judges' own answers and their peer verdicts |
+| **Human-labeled battles** (800 + 400) | `<name>_battles.jsonl`, `<name>_labels.jsonl`, `arena140k_human_ranking.json` | **Measure agreement and correlation with humans** (steps 2–3). The judges judge the original answer pairs, and their verdicts are compared with the human votes and the human ranking. | Yes: this is the only place they are used |
+
+The weight queries are questions taken from the sampled battles, but step 1 only uses the question text. The judges answer it themselves, so the human votes never influence the weights.
+
 Two datasets, used for different things:
 
 | Dataset | Human labels | What it is used for | Battles | Queries for weights |
