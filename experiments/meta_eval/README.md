@@ -12,8 +12,6 @@ Checks whether a PRD-weighted panel of LLM judges agrees with human preferences 
 
 ## Data
 
-The sampled data is already in `data/`:
-
 Two datasets, used for different things:
 
 | Dataset | Human labels | What it is used for | Battles | Queries for weights |
@@ -21,7 +19,7 @@ Two datasets, used for different things:
 | [`lmarena-ai/arena-human-preference-140k`](https://huggingface.co/datasets/lmarena-ai/arena-human-preference-140k) | Crowd votes from Arena users | **Battle level and ranking level.** It has many votes per model (over 9,900 decisive English votes between the 15 most-voted models), so it gives a stable human ranking to compare against. | 800, among those 15 models | 25 |
 | [`lmarena-ai/arena-expert-5k`](https://huggingface.co/datasets/lmarena-ai/arena-expert-5k) | Votes from expert users | **Battle level only.** Expert labels are more reliable, so this checks agreement with expert judgment. Votes are spread over ~100 models, too few per model for a stable ranking. | 400 | 25 |
 
-Files in `data/` (`<name>` is `arena140k` or `expert5k`):
+The sampled data is already in `data/`, so nothing needs to be downloaded (`<name>` is `arena140k` or `expert5k`):
 
 | File | Used in | Contents |
 |---|---|---|
