@@ -14,10 +14,16 @@ Following the PRD paper's Vicuna80 evaluation (PR vs single reviewers, at the ex
 
 | Dataset | Human labels | Battles judged | Queries for weights |
 |---|---|---:|---:|
-| [`lmarena-ai/arena-human-preference-140k`](https://huggingface.co/datasets/lmarena-ai/arena-human-preference-140k) | Crowd votes (2025) | 1,000 among the 15 most-voted models | 100 |
-| [`lmarena-ai/arena-expert-5k`](https://huggingface.co/datasets/lmarena-ai/arena-expert-5k) | Expert votes (2025) | 500 | 100 |
+| [`lmarena-ai/arena-human-preference-140k`](https://huggingface.co/datasets/lmarena-ai/arena-human-preference-140k) | Crowd votes (2025) | 800 among the 15 most-voted models | 25 |
+| [`lmarena-ai/arena-expert-5k`](https://huggingface.co/datasets/lmarena-ai/arena-expert-5k) | Expert votes (2025) | 400 | 25 |
 
-Battles kept: English, single-turn, text-only, and the human picked a winner (ties and "both bad" are excluded). Sampling uses a fixed seed (42). The weight queries are taken from the sampled battles, so both steps use the same questions.
+Battles kept: English, single-turn, text-only, the first vote of its Arena session (later votes can refer to earlier turns), and the human picked a winner (ties and "both bad" are excluded). Sampling uses a fixed seed (42). The weight queries are taken from the sampled battles, so both steps use the same questions.
+
+**The sampled data is already in `data/`**, so there is nothing to download. `prepare_data.py` rebuilds it from Hugging Face (~1.7 GB) if you want a different size or seed.
+
+Why these sizes (estimated from the 7-model leaderboard data):
+- **Weights.** With 25 questions, PRD weights stay within ~0.03 of the weights from all 137 questions, and the strong/weak judge split never changes.
+- **Battles.** The PRD panel disagrees with the unweighted panel on ~4% of decisions and with the best single judge on ~9%. Showing a significant difference therefore needs roughly 300 (vs best judge) to 600+ (vs unweighted) battles per dataset.
 
 ## Setup
 
@@ -40,18 +46,21 @@ In `judges.json`:
 ## Check the size before running
 
 ```bash
-python prepare_data.py --out data          # downloads ~1.7 GB from Hugging Face, ~1 min
 peereval generate data/arena140k_queries.jsonl data/expert5k_queries.jsonl --models judges.json --out runs/answers.jsonl --dry-run
 peereval judge data/arena140k_battles.jsonl data/expert5k_battles.jsonl --judges judges.json --out runs/battle_judgments.jsonl --dry-run
 ```
 
-With the defaults and 7 judges:
+With 7 judges:
 
-| Step | Calls | Notes |
-|---|---:|---|
-| 1a. Answer the weight queries | 1,400 | 200 queries × 7 models |
-| 1b. Peer-judge those answers | ~58,800 | 200 queries × 21 pairs × 7 judges × 2 orders. **The largest cost.** Halve it with `--n-weight-queries 50`. |
-| 2. Judge the human-labeled battles | 21,000 | 1,500 battles × 7 judges × 2 orders, about 51M input tokens |
+| | arena140k | expert5k | Total |
+|---|---:|---:|---:|
+| 1a. Answer the weight queries (7 × 25) | 175 | 175 | 350 |
+| 1b. Peer-judge those answers (25 × 21 pairs × 7 judges × 2 orders) | 7,350 | 7,350 | 14,700 |
+| 2. Judge the human-labeled battles (× 7 judges × 2 orders) | 11,200 | 5,600 | 16,800 |
+| **Calls** | **18,725** | **13,125** | **31,850** |
+| Estimated cost* | ~$281 | ~$198 | **~$479** |
+
+\*Assuming an average of $3 per million input tokens and $15 per million output tokens (including hidden reasoning) across the 7 models, about 2,400 input tokens per battle judgment and 2,500 per peer judgment. Replace with the real OpenRouter prices. Running Qwen3.8-27B and Muse Glimmer 30B locally with vLLM removes their share.
 
 `prepare_data.py` options: `--n-arena140k`, `--n-expert5k`, `--n-weight-queries`, `--top-models`, `--seed`.
 
@@ -76,5 +85,5 @@ Every step is resumable. If a run stops, or some calls fail, run the same comman
   - PRD panel minus the best single judge;
   - PRD panel minus the unweighted panel.
 - The "best single judge" is chosen after seeing the data, so its accuracy is optimistic. Beating or matching it is a strong result; beating the average single judge is the fair baseline.
-- At the ranking level, rank correlations computed on resampled battles are biased low, so only the differences between methods get intervals. With 1,000 battles over 15 models these intervals are wide (in a simulation, roughly ±0.1 to ±0.2 in Spearman). Treat ranking-level differences as supporting evidence; the battle-level comparison carries the result.
+- At the ranking level, rank correlations computed on resampled battles are biased low, so only the differences between methods get intervals. With ~800 battles over 15 models these intervals are wide (in a simulation, roughly ±0.1 to ±0.2 in Spearman). Treat ranking-level differences as supporting evidence; the battle-level comparison carries the result.
 - "Human votes on these battles" ranks the 15 models from the sampled human votes alone. It shows how close any judge can get with this many battles.

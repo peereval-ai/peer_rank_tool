@@ -9,3 +9,4 @@ experiments/*/data/
 experiments/*/runs/
 experiments/*/results/
 experiments/*/judges.json
+!experiments/meta_eval/data/

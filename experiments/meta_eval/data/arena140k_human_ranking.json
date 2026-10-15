@@ -1,0 +1,39 @@
+{
+  "source": "lmarena-ai/arena-human-preference-140k",
+  "filter": "English, decisive votes, battles between these models",
+  "votes": 9910,
+  "bradley_terry": {
+    "claude-opus-4-20250514": -0.07263008984037662,
+    "gemini-2.5-flash": 0.257678807418995,
+    "gemini-2.5-pro": 0.7346634875811185,
+    "o3-2025-04-16": 0.39398577517902017,
+    "qwen3-235b-a22b-no-thinking": 0.1440269679157167,
+    "mistral-medium-2505": 0.04921814084099345,
+    "chatgpt-4o-latest-20250326": 0.338712228975192,
+    "claude-sonnet-4-20250514": -0.3848564784867567,
+    "gemma-3-27b-it": -0.054641805548027965,
+    "claude-3-5-sonnet-20241022": -0.7290214395729152,
+    "claude-3-7-sonnet-20250219-thinking-32k": -0.6267412953772621,
+    "claude-3-7-sonnet-20250219": -0.5985954191151739,
+    "o3-mini": -0.3981704461408393,
+    "command-a-03-2025": -0.3886744414036836,
+    "o4-mini-2025-04-16": 0.05524454894408297
+  },
+  "ranking": [
+    "gemini-2.5-pro",
+    "o3-2025-04-16",
+    "chatgpt-4o-latest-20250326",
+    "gemini-2.5-flash",
+    "qwen3-235b-a22b-no-thinking",
+    "o4-mini-2025-04-16",
+    "mistral-medium-2505",
+    "gemma-3-27b-it",
+    "claude-opus-4-20250514",
+    "claude-sonnet-4-20250514",
+    "command-a-03-2025",
+    "o3-mini",
+    "claude-3-7-sonnet-20250219",
+    "claude-3-7-sonnet-20250219-thinking-32k",
+    "claude-3-5-sonnet-20241022"
+  ]
+}

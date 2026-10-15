@@ -7,7 +7,8 @@ Writes, for each source dataset:
 and for the 140k set also
   data/arena140k_human_ranking.json  Bradley-Terry ranking of the selected models from ALL their English decisive votes
 
-Battles kept: English, single-turn, text-only, human picked a clear winner (no tie / both_bad).
+Battles kept: English, single-turn, text-only, the first vote of its session (so the question does not
+depend on earlier turns), and the human picked a clear winner (no tie / both_bad).
 """
 from __future__ import annotations
 
@@ -138,6 +139,8 @@ def eligible(rows: list[dict]) -> list[dict]:
     for r in rows:
         if r.get("language") != "en" or r.get("winner") not in ("model_a", "model_b"):
             continue
+        if r.get("evaluation_order", 1) != 1:  # later votes in a session can refer to earlier turns
+            continue
         a, b = single_turn(r["conversation_a"]), single_turn(r["conversation_b"])
         if not a or not b or a[0] != b[0]:
             continue
@@ -149,9 +152,9 @@ def eligible(rows: list[dict]) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default="data")
-    ap.add_argument("--n-arena140k", type=int, default=1000, help="battles sampled from the 140k set")
-    ap.add_argument("--n-expert5k", type=int, default=500, help="battles sampled from the expert set")
-    ap.add_argument("--n-weight-queries", type=int, default=100,
+    ap.add_argument("--n-arena140k", type=int, default=800, help="battles sampled from the 140k set")
+    ap.add_argument("--n-expert5k", type=int, default=400, help="battles sampled from the expert set")
+    ap.add_argument("--n-weight-queries", type=int, default=25,
                     help="per dataset: questions our models answer to compute PRD weights (taken from the sampled battles)")
     ap.add_argument("--top-models", type=int, default=15,
                     help="140k: keep battles between the most-voted models only (stable human ranking)")
@@ -160,7 +163,7 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
-    cols = ["id", "model_a", "model_b", "winner", "conversation_a", "conversation_b", "language"]
+    cols = ["id", "model_a", "model_b", "winner", "conversation_a", "conversation_b", "language", "evaluation_order"]
 
     # --- 140k: battles among the most-voted models + human reference ranking
     rows = load_rows(SOURCES["arena140k"], cols + ["category_tag"])
