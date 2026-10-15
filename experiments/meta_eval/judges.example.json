@@ -1,9 +1,6 @@
 [
-  {"name": "claude-opus-5-5",  "model": "anthropic/claude-opus-5.5", "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
-  {"name": "glm-5.3",          "model": "z-ai/glm-5.3",              "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
-  {"name": "gpt-6-astra",      "model": "openai/gpt-6-astra",        "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
-  {"name": "kimi-k3",          "model": "moonshotai/kimi-k3",        "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
-  {"name": "grok-4.6",         "model": "x-ai/grok-4.6",             "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
-  {"name": "qwen3.8-27b",      "model": "qwen/qwen3.8-27b",          "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
-  {"name": "muse-glimmer-30b", "model": "meta/muse-glimmer-30b",     "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384}
+  {"name": "judge-a", "model": "provider/model-a", "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
+  {"name": "judge-b", "model": "provider/model-b", "base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "max_tokens": 16384},
+  {"name": "judge-c", "model": "local-model-name", "base_url": "http://localhost:8000/v1", "api_key_env": "LOCAL_API_KEY", "max_tokens": 16384,
+   "extra_body": {"chat_template_kwargs": {"enable_thinking": false}}}
 ]
