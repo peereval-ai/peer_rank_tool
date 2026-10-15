@@ -1,0 +1,3 @@
+peereval[judge] @ git+https://github.com/peereval-ai/peer_rank_tool.git
+huggingface_hub
+pyarrow

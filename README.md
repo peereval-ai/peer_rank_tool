@@ -75,6 +75,16 @@ Example output on `examples/judgments.jsonl` (3 models, 3 questions):
 | 2 | glm-5.3 | 0.644 | 0.454 | 0.458 | -0.154 | +31.2 |
 | 3 | gpt-6-astra | 0.102 | 0.000 | 0.403 | -0.306 | +89.6 |
 
+## Generating answers
+
+`peereval generate` asks every model every question and stores only the final answer: `<think>` blocks are removed, and answers that hit the token limit, come back empty or are cut off by a content filter are recorded with an `error` and retried on the next run.
+
+```bash
+peereval generate questions.jsonl --models models.json --out answers.jsonl
+```
+
+`questions.jsonl` rows need `question_id` and one of `question` / `prompt` / `instruction` (`dataset` is optional). `models.json` has the same format as `judges.json` below.
+
 ## Generating judgments
 
 `peereval judge` takes solver answers, asks every judge to compare every pair of answers to the same question in both display orders, and writes judgments in the format `peereval score` reads. Judges are called through any OpenAI-compatible endpoint (OpenAI, OpenRouter, vLLM, SGLang, ...).
@@ -84,7 +94,7 @@ peereval judge answers/*.jsonl --judges judges.json --out judgments.jsonl --conc
 peereval score judgments.jsonl
 ```
 
-The run is resumable: rerunning skips verdicts already in `--out` and retries failed ones.
+The run is resumable: rerunning skips verdicts already in `--out` and retries failed ones. Add `--dry-run` to `generate` or `judge` to see how many calls a run would make (and the prompt size) without calling anything. `--resume-by-cell` makes `judge` treat any valid verdict for the same question, display order and judge in `--out` as done, which lets you continue from judgments produced by another tool.
 
 `judges.json` is a list of judges (see `examples/judges.json`; the model strings there are examples, so replace them with your provider's ids):
 

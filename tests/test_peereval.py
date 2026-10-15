@@ -1,3 +1,4 @@
+import json
 import math
 import warnings
 
@@ -133,3 +134,22 @@ def test_bootstrap_intervals_and_rank_ub():
         assert lo <= r.prd[m] <= hi
     assert r.rank_ub == {"x": 1, "y": 2, "z": 3}  # identical questions: no uncertainty
     assert "95% CI" in r.to_markdown()
+
+
+def test_generate_marks_incomplete_and_resumes(tmp_path, monkeypatch):
+    from peereval import ModelConfig, run_generation
+
+    replies = iter([
+        {"text": "<think>plan</think>Answer one", "finish_reason": "stop", "usage": None},
+        {"text": "cut off mid", "finish_reason": "length", "usage": None},
+        {"text": "Answer two", "finish_reason": "stop", "usage": None},
+    ])
+    monkeypatch.setattr(ModelConfig, "make_chat", lambda self: (lambda prompt: next(replies)))
+    qs = [{"dataset": "d", "question_id": "1", "question": "q1"}, {"dataset": "d", "question_id": "2", "question": "q2"}]
+    out = tmp_path / "a.jsonl"
+    m = [ModelConfig(name="x", model="x")]
+    assert run_generation(qs, m, out, concurrency=1) == 2
+    rows = [json.loads(l) for l in out.read_text().splitlines()]
+    good = [r for r in rows if not r["error"]]
+    assert len(good) == 1 and good[0]["response"] == "Answer one"
+    assert run_generation(qs, m, out, concurrency=1) == 1  # only the incomplete one is retried

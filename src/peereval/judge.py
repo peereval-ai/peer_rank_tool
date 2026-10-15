@@ -13,7 +13,7 @@ import re
 import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from itertools import combinations
 from pathlib import Path
@@ -75,12 +75,13 @@ class JudgeConfig:
     temperature: float | None = 0.0       # None = don't send (some reasoning models reject it)
     extra_body: dict[str, Any] = field(default_factory=dict)  # e.g. {"chat_template_kwargs": {"enable_thinking": False}}
 
-    def make_call(self) -> Callable[[str], str]:
+    def make_chat(self) -> Callable[[str], dict[str, Any]]:
+        """Return a function prompt -> {"text", "finish_reason", "usage"}."""
         from openai import OpenAI  # optional dependency: pip install "peereval[judge]"
 
         client = OpenAI(base_url=self.base_url, api_key=os.environ.get(self.api_key_env, "EMPTY"))
 
-        def call(prompt: str) -> str:
+        def chat(prompt: str) -> dict[str, Any]:
             kwargs: dict[str, Any] = {self.max_tokens_param: self.max_tokens}
             if self.temperature is not None:
                 kwargs["temperature"] = self.temperature
@@ -90,13 +91,28 @@ class JudgeConfig:
                 extra_body=self.extra_body or None,
                 **kwargs,
             )
-            return resp.choices[0].message.content or ""
+            choice = resp.choices[0]
+            usage = resp.usage.model_dump() if getattr(resp, "usage", None) else None
+            return {"text": choice.message.content or "", "finish_reason": choice.finish_reason, "usage": usage}
 
-        return call
+        return chat
+
+    def make_call(self) -> Callable[[str], str]:
+        chat = self.make_chat()
+        return lambda prompt: chat(prompt)["text"]
+
+
+# The same settings describe a solver model in `peereval generate`.
+ModelConfig = JudgeConfig
 
 
 def load_judge_configs(path: str | Path) -> list[JudgeConfig]:
-    return [JudgeConfig(**c) for c in json.loads(Path(path).read_text())]
+    """Read a JSON list of model configs. Keys that are not config fields (e.g. "org") are ignored."""
+    names = {f.name for f in fields(JudgeConfig)}
+    return [JudgeConfig(**{k: v for k, v in c.items() if k in names}) for c in json.loads(Path(path).read_text())]
+
+
+load_model_configs = load_judge_configs
 
 
 def _key(*parts: str) -> str:
@@ -134,22 +150,34 @@ def run_judging(
     concurrency: int = 4,
     strip_think: bool = True,
     prompt_template: str = JUDGE_PROMPT,
-) -> int:
+    resume_by_cell: bool = False,
+    dry_run: bool = False,
+) -> int | dict:
     """Judge every pair of answers with every judge and append verdicts to ``output``.
 
     Already-valid verdicts in ``output`` are skipped, so an interrupted run can be
     resumed by calling this again. Failed calls are written with an ``error`` field
     and retried on the next run. Returns the number of new rows written.
+
+    By default a verdict counts as done only if the exact same prompt was judged
+    (so a changed answer is re-judged). With ``resume_by_cell=True`` any valid
+    verdict for the same (question, displayed pair, judge) counts, which lets you
+    reuse judgments produced by another tool. With ``dry_run=True`` nothing is
+    called; a dict with the number of pending calls and prompt characters is returned.
     """
     if not (isinstance(answers, list) and answers and isinstance(answers[0], dict)):
         answers = read_jsonl(answers)  # type: ignore[arg-type]
+    from .generate import valid_answers  # local import: generate imports this module
+
+    answers = valid_answers(answers)
     output = Path(output)
-    done = set()
+    done, done_cells = set(), set()
     if output.exists():
         for r in read_jsonl(output):
             if not r.get("error") and (r.get("judgment") or {}).get("winner") in ("A", "B", "tie"):
                 done.add(r.get("cache_key"))
-    calls = {j.name: j.make_call() for j in judges}
+                done_cells.add((str(r.get("dataset", "default")), str(r.get("question_id")),
+                                r.get("response_a_model"), r.get("response_b_model"), r.get("judge_model")))
     tasks = build_tasks(answers, [j.name for j in judges])
     if not tasks:
         warnings.warn("peereval: no question was answered by every model, so there is nothing to judge", stacklevel=2)
@@ -159,9 +187,15 @@ def run_judging(
         prompt = prompt_template.format(question=t["question"], response_a=ra, response_b=rb)
         t["cache_key"] = _key(t["dataset"], t["question_id"], t["response_a_model"], t["response_b_model"],
                               t["judge_model"], hashlib.sha256(prompt.encode()).hexdigest())
-        if t["cache_key"] not in done:
+        cell = (t["dataset"], t["question_id"], t["response_a_model"], t["response_b_model"], t["judge_model"])
+        if t["cache_key"] not in done and not (resume_by_cell and cell in done_cells):
             t["_prompt"] = prompt
             pending.append(t)
+
+    if dry_run:
+        return {"pending_calls": len(pending), "prompt_chars": sum(len(t["_prompt"]) for t in pending),
+                "approx_input_tokens": sum(len(t["_prompt"]) for t in pending) // 4}
+    calls = {j.name: j.make_call() for j in judges}
 
     lock = threading.Lock()
 

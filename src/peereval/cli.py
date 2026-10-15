@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from .generate import run_generation
 from .judge import load_judge_configs, run_judging
 from .leaderboard import score
 
@@ -24,12 +25,23 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--json", help="Write full results (scores, weights, matrices) to this JSON file.")
     s.add_argument("--csv", help="Write the leaderboard tables to this CSV file.")
 
+    g = sub.add_parser("generate", help="Generate solver answers to questions.")
+    g.add_argument("questions", nargs="+", help="Question JSONL file(s): question_id + question/prompt.")
+    g.add_argument("--models", required=True, help="JSON list of model configs (same format as --judges).")
+    g.add_argument("--out", required=True, help="Answer JSONL to write (appended; resumable).")
+    g.add_argument("--concurrency", type=int, default=4)
+    g.add_argument("--keep-think", action="store_true", help="Do not strip <think> blocks from answers.")
+    g.add_argument("--dry-run", action="store_true", help="Only count the calls that would be made.")
+
     j = sub.add_parser("judge", help="Generate pairwise judgments from solver answers.")
     j.add_argument("answers", nargs="+", help="Solver answer JSONL file(s).")
     j.add_argument("--judges", required=True, help="JSON list of judge configs.")
     j.add_argument("--out", required=True, help="Judgment JSONL to write (appended; resumable).")
     j.add_argument("--concurrency", type=int, default=4)
     j.add_argument("--keep-think", action="store_true", help="Do not strip <think> blocks from answers.")
+    j.add_argument("--resume-by-cell", action="store_true",
+                   help="Treat any valid verdict for the same question/pair/order/judge in --out as done.")
+    j.add_argument("--dry-run", action="store_true", help="Only count the calls (and prompt size) that would be made.")
 
     args = ap.parse_args(argv)
     if args.cmd == "score":
@@ -40,10 +52,15 @@ def main(argv: list[str] | None = None) -> int:
             board.to_json(args.json)
         if args.csv:
             board.to_csv(args.csv)
+    elif args.cmd == "generate":
+        n = run_generation(args.questions, load_judge_configs(args.models), args.out,
+                           concurrency=args.concurrency, strip_think=not args.keep_think, dry_run=args.dry_run)
+        print(n if args.dry_run else f"wrote {n} answers to {args.out}", file=sys.stderr)
     else:
         n = run_judging(args.answers, load_judge_configs(args.judges), args.out,
-                        concurrency=args.concurrency, strip_think=not args.keep_think)
-        print(f"wrote {n} judgments to {args.out}", file=sys.stderr)
+                        concurrency=args.concurrency, strip_think=not args.keep_think,
+                        resume_by_cell=args.resume_by_cell, dry_run=args.dry_run)
+        print(n if args.dry_run else f"wrote {n} judgments to {args.out}", file=sys.stderr)
     return 0
 
 
