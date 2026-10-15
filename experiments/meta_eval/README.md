@@ -14,17 +14,21 @@ Checks whether a PRD-weighted panel of LLM judges agrees with human preferences 
 
 The sampled data is already in `data/`:
 
-| File | Contents |
-|---|---|
-| `<name>_queries.jsonl` | Queries the judge models answer in step 1 |
-| `<name>_battles.jsonl` | The human-labeled battles, two rows each (`model_a` / `model_b`), input to `peereval judge` in step 2 |
-| `<name>_labels.jsonl` | The real model names, the human winner and category tags of each battle |
-| `arena140k_human_ranking.json` | Human Bradley-Terry ranking of the battle models |
+Two datasets, used for different things:
 
-| Dataset | Human labels | Battles | Queries for weights |
-|---|---|---:|---:|
-| [`lmarena-ai/arena-human-preference-140k`](https://huggingface.co/datasets/lmarena-ai/arena-human-preference-140k) | Crowd votes | 800, among the 15 most-voted models | 25 |
-| [`lmarena-ai/arena-expert-5k`](https://huggingface.co/datasets/lmarena-ai/arena-expert-5k) | Expert votes | 400 | 25 |
+| Dataset | Human labels | What it is used for | Battles | Queries for weights |
+|---|---|---|---:|---:|
+| [`lmarena-ai/arena-human-preference-140k`](https://huggingface.co/datasets/lmarena-ai/arena-human-preference-140k) | Crowd votes from Arena users | **Battle level and ranking level.** It has many votes per model (over 9,900 decisive English votes between the 15 most-voted models), so it gives a stable human ranking to compare against. | 800, among those 15 models | 25 |
+| [`lmarena-ai/arena-expert-5k`](https://huggingface.co/datasets/lmarena-ai/arena-expert-5k) | Votes from expert users | **Battle level only.** Expert labels are more reliable, so this checks agreement with expert judgment. Votes are spread over ~100 models, too few per model for a stable ranking. | 400 | 25 |
+
+Files in `data/` (`<name>` is `arena140k` or `expert5k`):
+
+| File | Used in | Contents |
+|---|---|---|
+| `<name>_queries.jsonl` | Step 1 | Queries the judge models answer, so their own answers can be peer-judged to get PRD weights |
+| `<name>_battles.jsonl` | Step 2 | The human-labeled battles, two rows each (`model_a` / `model_b`), input to `peereval judge` |
+| `<name>_labels.jsonl` | Step 3 | The real model names, the human winner and category tags of each battle |
+| `arena140k_human_ranking.json` | Step 3 | Human Bradley-Terry ranking of the 15 models, for the ranking-level comparison |
 
 Battles kept: English, single-turn, text-only, the first vote of its Arena session (later votes can refer to earlier turns), and the human picked a winner (ties and "both bad" are excluded). Sampling uses seed 42. The weight queries are taken from the sampled battles, so both steps use the same questions.
 
