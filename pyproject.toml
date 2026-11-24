@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peereval"
-version = "0.1.1"
+version = "0.1.2"
 authors = [{ name = "Liqiang Jing" }]
 description = "Rank LLMs by having them judge each other: PRD Peer Rank, judge weights, and self-bias from pairwise judgments."
 readme = "README.md"

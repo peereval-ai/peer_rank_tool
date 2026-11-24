@@ -75,6 +75,30 @@ Example output on `examples/judgments.jsonl` (3 models, 3 questions):
 | 2 | glm-5.3 | 0.644 | 0.454 | 0.458 | -0.154 | +31.2 |
 | 3 | gpt-6-astra | 0.102 | 0.000 | 0.403 | -0.306 | +89.6 |
 
+## Judge weights and panel verdicts
+
+PRD weights can be fitted once and reused. Fit them on a peer evaluation, where the judges also answered the questions and judged each other, then use them to combine the same judges' verdicts on new pairs of answers into one panel verdict:
+
+```python
+import peereval
+
+weights = peereval.fit_weights("peer_judgments.jsonl")      # {judge: weight}, sums to 1
+peereval.save_weights(weights, "weights.json")
+
+verdicts = peereval.panel_verdicts("new_judgments.jsonl", weights)
+verdicts[0]  # {"model_a", "model_b", "preference", "winner", "judges", ...}
+```
+
+```bash
+peereval weights peer_judgments.jsonl --out weights.json
+peereval panel new_judgments.jsonl --weights weights.json --out panel.jsonl
+```
+
+- `preference` is the panel's preference for `model_a` (1 = always `model_a`, 0.5 = even, 0 = always `model_b`). Each judge's verdicts are first averaged over the two display orders, then judges are averaged with their weights.
+- Judges missing from the weights count 0. Without `--weights` every judge counts equally.
+- `load_weights` also reads the judge weights from `peereval score --json` output.
+- `new_judgments.jsonl` uses the judgment format below and can come from `peereval judge`, e.g. on pairs of answers from models outside the panel.
+
 ## Generating answers
 
 `peereval generate` asks every model every question and stores only the final answer: `<think>` blocks are removed, and answers that hit the token limit, come back empty or are cut off by a content filter are recorded with an `error` and retried on the next run.

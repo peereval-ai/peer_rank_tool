@@ -1,12 +1,14 @@
-"""Command line: ``peereval score`` and ``peereval judge``."""
+"""Command line: ``peereval score``, ``generate``, ``judge``, ``weights`` and ``panel``."""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from .generate import run_generation
 from .judge import load_judge_configs, run_judging
 from .leaderboard import score
+from .panel import fit_weights, load_weights, panel_verdicts, save_weights
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,6 +45,17 @@ def main(argv: list[str] | None = None) -> int:
                    help="Treat any valid verdict for the same question/pair/order/judge in --out as done.")
     j.add_argument("--dry-run", action="store_true", help="Only count the calls (and prompt size) that would be made.")
 
+    w = sub.add_parser("weights", help="Fit PRD judge weights from peer judgments.")
+    w.add_argument("judgments", nargs="+", help="Peer judgment JSONL file(s): the judges also answered the questions.")
+    w.add_argument("--models", nargs="+", help="Contestants to keep (default: all).")
+    w.add_argument("--out", required=True, help="Write {judge: weight} JSON here.")
+
+    p = sub.add_parser("panel", help="Combine judges' verdicts on each pair into one weighted panel verdict.")
+    p.add_argument("judgments", nargs="+", help="Judgment JSONL file(s) on the pairs to decide.")
+    p.add_argument("--weights", help="Judge weights from `peereval weights` (or `peereval score --json`). "
+                                     "Default: every judge counts equally.")
+    p.add_argument("--out", required=True, help="Write one panel verdict per pair to this JSONL file.")
+
     args = ap.parse_args(argv)
     if args.cmd == "score":
         board = score(args.judgments, models=args.models, by_dataset=not args.no_by_dataset,
@@ -52,6 +65,17 @@ def main(argv: list[str] | None = None) -> int:
             board.to_json(args.json)
         if args.csv:
             board.to_csv(args.csv)
+    elif args.cmd == "weights":
+        weights = fit_weights(args.judgments, models=args.models)
+        save_weights(weights, args.out)
+        for judge, wt in sorted(weights.items(), key=lambda x: -x[1]):
+            print(f"{judge}\t{wt:.3f}")
+    elif args.cmd == "panel":
+        rows = panel_verdicts(args.judgments, load_weights(args.weights) if args.weights else None)
+        with open(args.out, "w", encoding="utf-8") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+        print(f"wrote {len(rows)} panel verdicts to {args.out}", file=sys.stderr)
     elif args.cmd == "generate":
         n = run_generation(args.questions, load_judge_configs(args.models), args.out,
                            concurrency=args.concurrency, strip_think=not args.keep_think, dry_run=args.dry_run)

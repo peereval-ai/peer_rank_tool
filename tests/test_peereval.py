@@ -153,3 +153,66 @@ def test_generate_marks_incomplete_and_resumes(tmp_path, monkeypatch):
     good = [r for r in rows if not r["error"]]
     assert len(good) == 1 and good[0]["response"] == "Answer one"
     assert run_generation(qs, m, out, concurrency=1) == 1  # only the incomplete one is retried
+
+
+def test_fit_weights_matches_score_and_sums_to_one():
+    rows = full_round("q1", lambda l, r: "x" if "x" in (l, r) else "y")
+    from peereval import fit_weights
+    w = fit_weights(rows)
+    assert w == pytest.approx(score(rows).overall.judge_weights)
+    assert sum(w.values()) == pytest.approx(1.0)
+    assert w["z"] == 0.0 and w["x"] > w["y"] > 0
+
+
+def test_fit_weights_needs_contestant_judges():
+    from peereval import fit_weights
+    rows = [row("q1", "x", "y", "outsider", "AB", "A")]
+    with pytest.raises(ValueError):
+        fit_weights(rows)
+
+
+def test_panel_verdicts_weighted_and_unweighted():
+    from peereval import panel_verdicts
+    # judge j1 prefers x in both orders; j2 prefers y in both orders; j3 flips with the order
+    rows = []
+    for pos in ("AB", "BA"):
+        a = "x" if pos == "AB" else "y"
+        rows.append(row("q9", "x", "y", "j1", pos, "A" if a == "x" else "B"))
+        rows.append(row("q9", "x", "y", "j2", pos, "A" if a == "y" else "B"))
+        rows.append(row("q9", "x", "y", "j3", pos, "A"))
+    [v] = panel_verdicts(rows)
+    assert (v["model_a"], v["model_b"]) == ("x", "y")
+    assert v["judges"] == {"j1": 1.0, "j2": 0.0, "j3": 0.5}
+    assert v["preference"] == pytest.approx(0.5) and v["winner"] == "tie"
+    [v] = panel_verdicts(rows, {"j1": 0.6, "j2": 0.2, "j3": 0.2})
+    assert v["preference"] == pytest.approx(0.6 * 1 + 0.2 * 0 + 0.2 * 0.5)
+    assert v["winner"] == "x"
+    [v] = panel_verdicts(rows, {"j2": 1.0})  # judges missing from the weights get 0
+    assert v["preference"] == 0.0 and v["winner"] == "y"
+    [v] = panel_verdicts(rows, {"other": 1.0})
+    assert v["preference"] is None and v["winner"] is None
+
+
+def test_weights_roundtrip_and_cli(tmp_path):
+    from peereval import load_weights, save_weights
+    from peereval.cli import main
+    peer = full_round("q1", lambda l, r: "x" if "x" in (l, r) else "y")
+    peer_file = tmp_path / "peer.jsonl"
+    peer_file.write_text("\n".join(json.dumps(r) for r in peer))
+    # `peereval weights` writes the same weights `score --json` reports
+    assert main(["weights", str(peer_file), "--out", str(tmp_path / "w.json")]) == 0
+    w = load_weights(tmp_path / "w.json")
+    score(peer).to_json(tmp_path / "board.json")
+    assert load_weights(tmp_path / "board.json") == pytest.approx(w)
+    save_weights(w, tmp_path / "w2.json")
+    assert load_weights(tmp_path / "w2.json") == pytest.approx(w)
+    # `peereval panel` applies them to new pairs
+    new = [row("n1", "a", "b", "x", "AB", "A"), row("n1", "a", "b", "x", "BA", "B"),
+           row("n1", "a", "b", "z", "AB", "B"), row("n1", "a", "b", "z", "BA", "A")]
+    new_file = tmp_path / "new.jsonl"
+    new_file.write_text("\n".join(json.dumps(r) for r in new))
+    out = tmp_path / "panel.jsonl"
+    assert main(["panel", str(new_file), "--weights", str(tmp_path / "w.json"), "--out", str(out)]) == 0
+    [v] = [json.loads(l) for l in out.read_text().splitlines()]
+    assert v["judges"] == {"x": 1.0, "z": 0.0}
+    assert v["winner"] == "a"  # z has weight 0, so x decides
